@@ -30,31 +30,61 @@ vrfs.csv
 
 ## Requisitos / Requirements
 
-* Python 3.12+
+* Windows
+* Python 3.12 o superior / Python 3.12 or newer
+* Conexión a Internet para la instalación inicial de dependencias / Internet connection for the initial dependency installation
+
+Dependencias Python / Python dependencies:
+
 * pandas
 * requests
 
 ## Instalación / Installation
 
-```bash
-python -m pip install -r requirements.txt
+Primero instalá **Python 3.12 o superior** desde:
+
+https://www.python.org/downloads/
+
+Después ejecutá:
+
+```text
+install.bat
 ```
+
+El script verifica que Python esté instalado e instala las dependencias necesarias.
+
+The script checks that Python is installed and installs the required dependencies.
 
 ## Uso / Usage
 
-```bash
-python main.py
+Una vez instalado, ejecutá:
+
+```text
+run.bat
 ```
 
-Seleccioná la carpeta de exportación phpIPAM, la carpeta de destino e ingresá el **Site de NetBox**.
+La aplicación se abrirá automáticamente.
 
-Select the phpIPAM export folder, destination folder, and the **NetBox Site**.
+The application will start automatically.
+
+Desde la interfaz:
+
+1. Seleccioná la carpeta de exportación phpIPAM.
+2. Seleccioná la carpeta de destino.
+3. Ingresá el **Site de NetBox**.
+4. Presioná **Analizar**.
+5. Revisá los resultados.
+6. Presioná **Convertir**.
 
 ## Importante / Important
 
-La herramienta **genera CSV y no modifica directamente NetBox**. Revisá los archivos antes de importarlos.
+La herramienta **genera archivos CSV y no modifica directamente NetBox**.
 
-The tool **generates CSV files and does not directly modify NetBox**. Review the generated files before importing them.
+Revisá los archivos generados antes de importarlos en NetBox.
+
+The tool **generates CSV files and does not directly modify NetBox**.
+
+Review the generated files before importing them into NetBox.
 
 ## Licencia / License
 
