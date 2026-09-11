@@ -123,9 +123,8 @@ def preparar_manufacturers(
     analisis: dict,
 ) -> list[str]:
     """
-    Obtiene los Manufacturers resueltos durante el análisis.
-
-    No vuelve a ejecutar manufacturer_finder.
+    Obtiene únicamente los Manufacturers resueltos
+    durante el análisis.
     """
 
     resultados = (
@@ -170,7 +169,7 @@ def preparar_roles(
     analisis: dict,
 ) -> list[dict]:
     """
-    Obtiene los Roles recomendados durante el análisis.
+    Obtiene los Roles recomendados por el análisis.
 
     Utiliza los colores definidos en role_defaults.py.
     """
@@ -187,7 +186,9 @@ def preparar_roles(
         )
     )
 
-    roles_default = obtener_roles_default()
+    roles_default = (
+        obtener_roles_default()
+    )
 
     colores = {
         role["name"].lower(): role["color"]
@@ -235,9 +236,10 @@ def preparar_device_types(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
     """
-    Convierte Device Types de phpIPAM.
+    Prepara los Device Types para NetBox.
 
-    El Manufacturer se obtiene del análisis previo.
+    El Manufacturer se obtiene exclusivamente
+    del análisis previo.
     """
 
     df = datos.get(
@@ -246,6 +248,10 @@ def preparar_device_types(
 
     if df is None:
         return []
+
+    # --------------------------------------------------------
+    # ÍNDICE DE MANUFACTURERS
+    # --------------------------------------------------------
 
     manufacturer_index = {}
 
@@ -283,6 +289,10 @@ def preparar_device_types(
                 tipo.lower()
             ] = manufacturer
 
+    # --------------------------------------------------------
+    # CONSTRUIR DEVICE TYPES
+    # --------------------------------------------------------
+
     registros = []
 
     for _, fila in df.iterrows():
@@ -304,9 +314,11 @@ def preparar_device_types(
         if not model:
             continue
 
-        manufacturer = manufacturer_index.get(
-            model.lower(),
-            "",
+        manufacturer = (
+            manufacturer_index.get(
+                model.lower(),
+                "",
+            )
         )
 
         registros.append(
@@ -336,7 +348,7 @@ def preparar_devices(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
     """
-    Convierte Devices de phpIPAM.
+    Prepara los Devices de phpIPAM.
     """
 
     df = datos.get(
@@ -406,6 +418,9 @@ def preparar_devices(
 def preparar_vlans(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
+    """
+    Prepara las VLANs de phpIPAM.
+    """
 
     df = datos.get(
         "VLAN"
@@ -458,6 +473,9 @@ def preparar_vlans(
 def preparar_prefixes(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
+    """
+    Prepara los Prefixes desde Subnets.
+    """
 
     df = datos.get(
         "Subnets"
@@ -510,6 +528,9 @@ def preparar_prefixes(
 def preparar_ip_addresses(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
+    """
+    Prepara las IP Addresses desde phpIPAM.
+    """
 
     df = datos.get(
         "IP Addresses"
@@ -566,6 +587,9 @@ def preparar_ip_addresses(
 def preparar_vrfs(
     datos: dict[str, pd.DataFrame],
 ) -> list[dict]:
+    """
+    Prepara los VRFs desde phpIPAM.
+    """
 
     df = datos.get(
         "VRF"
@@ -624,9 +648,6 @@ def convertir_exportacion(
     el resultado del análisis previamente ejecutado.
 
     El análisis NO se vuelve a ejecutar.
-
-    progress_callback:
-        función(porcentaje, mensaje)
     """
 
     origen = Path(
@@ -702,6 +723,8 @@ def convertir_exportacion(
         progress_callback,
     )
 
+    resultados = {}
+
     # ========================================================
     # MANUFACTURERS
     # ========================================================
@@ -718,16 +741,12 @@ def convertir_exportacion(
 
     if manufacturers:
 
-        resultados_manufacturers = (
-            convertir_manufacturers(
-                manufacturers,
-                destino,
-            )
+        resultados[
+            "manufacturers"
+        ] = convertir_manufacturers(
+            manufacturers,
+            destino,
         )
-
-    else:
-
-        resultados_manufacturers = None
 
     # ========================================================
     # ROLES
@@ -745,16 +764,12 @@ def convertir_exportacion(
 
     if roles:
 
-        resultados_roles = (
-            convertir_roles(
-                roles,
-                destino,
-            )
+        resultados[
+            "roles"
+        ] = convertir_roles(
+            roles,
+            destino,
         )
-
-    else:
-
-        resultados_roles = None
 
     # ========================================================
     # DEVICE TYPES
@@ -773,16 +788,12 @@ def convertir_exportacion(
 
     if device_types:
 
-        resultados_device_types = (
-            convertir_device_types(
-                device_types,
-                destino,
-            )
+        resultados[
+            "device_types"
+        ] = convertir_device_types(
+            device_types,
+            destino,
         )
-
-    else:
-
-        resultados_device_types = None
 
     # ========================================================
     # DEVICES
@@ -800,18 +811,14 @@ def convertir_exportacion(
 
     if devices:
 
-        resultados_devices = (
-            convertir_devices(
-                devices,
-                destino,
-                site,
-                roles_por_tipo,
-            )
+        resultados[
+            "devices"
+        ] = convertir_devices(
+            devices,
+            destino,
+            site,
+            roles_por_tipo,
         )
-
-    else:
-
-        resultados_devices = None
 
     # ========================================================
     # VLANS
@@ -829,16 +836,12 @@ def convertir_exportacion(
 
     if vlans:
 
-        resultados_vlans = (
-            convertir_vlans(
-                vlans,
-                destino,
-            )
+        resultados[
+            "vlans"
+        ] = convertir_vlans(
+            vlans,
+            destino,
         )
-
-    else:
-
-        resultados_vlans = None
 
     # ========================================================
     # PREFIXES
@@ -856,16 +859,12 @@ def convertir_exportacion(
 
     if prefixes:
 
-        resultados_prefixes = (
-            convertir_prefixes(
-                prefixes,
-                destino,
-            )
+        resultados[
+            "prefixes"
+        ] = convertir_prefixes(
+            prefixes,
+            destino,
         )
-
-    else:
-
-        resultados_prefixes = None
 
     # ========================================================
     # IP ADDRESSES
@@ -883,16 +882,12 @@ def convertir_exportacion(
 
     if ip_addresses:
 
-        resultados_ip_addresses = (
-            convertir_ip_addresses(
-                ip_addresses,
-                destino,
-            )
+        resultados[
+            "ip_addresses"
+        ] = convertir_ip_addresses(
+            ip_addresses,
+            destino,
         )
-
-    else:
-
-        resultados_ip_addresses = None
 
     # ========================================================
     # VRFS
@@ -910,70 +905,16 @@ def convertir_exportacion(
 
     if vrfs:
 
-        resultados_vrfs = (
-            convertir_vrfs(
-                vrfs,
-                destino,
-            )
-        )
-
-    else:
-
-        resultados_vrfs = None
-
-    # ========================================================
-    # RESULTADOS
-    # ========================================================
-
-    resultados = {}
-
-    if resultados_manufacturers is not None:
-
-        resultados[
-            "manufacturers"
-        ] = resultados_manufacturers
-
-    if resultados_roles is not None:
-
-        resultados[
-            "roles"
-        ] = resultados_roles
-
-    if resultados_device_types is not None:
-
-        resultados[
-            "device_types"
-        ] = resultados_device_types
-
-    if resultados_devices is not None:
-
-        resultados[
-            "devices"
-        ] = resultados_devices
-
-    if resultados_vlans is not None:
-
-        resultados[
-            "vlans"
-        ] = resultados_vlans
-
-    if resultados_prefixes is not None:
-
-        resultados[
-            "prefixes"
-        ] = resultados_prefixes
-
-    if resultados_ip_addresses is not None:
-
-        resultados[
-            "ip_addresses"
-        ] = resultados_ip_addresses
-
-    if resultados_vrfs is not None:
-
         resultados[
             "vrfs"
-        ] = resultados_vrfs
+        ] = convertir_vrfs(
+            vrfs,
+            destino,
+        )
+
+    # ========================================================
+    # FINALIZAR
+    # ========================================================
 
     actualizar_progreso(
         progress_callback,

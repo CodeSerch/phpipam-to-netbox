@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import re
+
 from dataclasses import dataclass
+
 from html import unescape
+
 from urllib.parse import (
     quote_plus,
     urlparse,
@@ -36,18 +39,14 @@ LOCAL_MANUFACTURERS = {
     "Router-HW": "Huawei",
     "Switch-HW": "Huawei",
     "OLT-HW": "Huawei",
-
     "Router-MK": "MikroTik",
     "Firewall-MK": "MikroTik",
-
     "DELL-DL380": "HPE",
     "DELL-DL385p": "HPE",
-
     "DELL-R730": "Dell",
     "DELL-R740": "Dell",
     "DELL-7920": "Dell",
     "DELL-ME5024": "Dell",
-
     "QNAP": "QNAP",
 }
 
@@ -61,40 +60,31 @@ MANUFACTURER_DOMAINS = {
         "dell.com",
         "delltechnologies.com",
     },
-
     "HPE": {
         "hpe.com",
         "hp.com",
     },
-
     "Cisco": {
         "cisco.com",
     },
-
     "Huawei": {
         "huawei.com",
     },
-
     "MikroTik": {
         "mikrotik.com",
     },
-
     "QNAP": {
         "qnap.com",
     },
-
     "Arista": {
         "arista.com",
     },
-
     "Juniper": {
         "juniper.net",
     },
-
     "Lenovo": {
         "lenovo.com",
     },
-
     "Supermicro": {
         "supermicro.com",
     },
@@ -124,7 +114,9 @@ SESSION.headers.update(
 # NORMALIZAR TEXTO
 # ============================================================
 
-def normalizar_texto(valor: str) -> str:
+def normalizar_texto(
+    valor: str,
+) -> str:
 
     return " ".join(
         str(valor)
@@ -137,7 +129,9 @@ def normalizar_texto(valor: str) -> str:
 # NORMALIZAR PARA COMPARACIÓN
 # ============================================================
 
-def normalizar_comparacion(valor: str) -> str:
+def normalizar_comparacion(
+    valor: str,
+) -> str:
 
     valor = normalizar_texto(
         valor
@@ -161,6 +155,50 @@ def normalizar_comparacion(valor: str) -> str:
 
 
 # ============================================================
+# DETERMINAR SI PARECE MODELO DE HARDWARE
+# ============================================================
+
+def parece_modelo_hardware(
+    modelo: str,
+) -> bool:
+    """
+    Determina por estructura si un Device Type
+    parece un modelo/familia de hardware.
+
+    No utiliza listas manuales de marcas o modelos.
+    """
+
+    modelo = normalizar_texto(
+        modelo
+    )
+
+    if not modelo:
+        return False
+
+    # --------------------------------------------------------
+    # Un modelo técnico suele contener números.
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\d",
+        modelo
+    ):
+        return True
+
+    # --------------------------------------------------------
+    # Código técnico compacto.
+    # --------------------------------------------------------
+
+    if re.search(
+        r"\b[A-Za-z]{1,10}[- ]?\d{2,}[A-Za-z0-9-]*\b",
+        modelo
+    ):
+        return True
+
+    return False
+
+
+# ============================================================
 # BUSCAR LOCALMENTE
 # ============================================================
 
@@ -172,21 +210,35 @@ def buscar_manufacturer_local(
         modelo
     )
 
-    manufacturer = LOCAL_MANUFACTURERS.get(
-        modelo,
-        ""
+    comparacion = normalizar_comparacion(
+        modelo
     )
 
-    if manufacturer:
+    for modelo_local, manufacturer in LOCAL_MANUFACTURERS.items():
 
-        return ManufacturerResult(
-            model=modelo,
-            manufacturer=manufacturer,
-            source="local",
-            confidence="high",
-            match_type="exact",
-            matched_model=modelo,
-        )
+        if (
+            normalizar_comparacion(
+                modelo_local
+            )
+            == comparacion
+        ):
+
+            print(
+                f"[LOCAL] {modelo} -> {manufacturer}"
+            )
+
+            return ManufacturerResult(
+                model=modelo,
+                manufacturer=manufacturer,
+                source="local",
+                confidence="high",
+                match_type="exact",
+                matched_model=modelo_local,
+            )
+
+    print(
+        f"[LOCAL] {modelo} -> no encontrado"
+    )
 
     return ManufacturerResult(
         model=modelo,
@@ -201,7 +253,9 @@ def buscar_manufacturer_local(
 # EXTRAER DOMINIO
 # ============================================================
 
-def obtener_dominio(url: str) -> str:
+def obtener_dominio(
+    url: str,
+) -> str:
 
     try:
 
@@ -210,7 +264,6 @@ def obtener_dominio(url: str) -> str:
         ).strip()
 
         if url.startswith("//"):
-
             url = "https:" + url
 
         parsed = urlparse(
@@ -240,7 +293,6 @@ def obtener_dominio(url: str) -> str:
         dominio = parsed.netloc.lower()
 
         if dominio.startswith("www."):
-
             dominio = dominio[4:]
 
         return dominio
@@ -270,7 +322,6 @@ def manufacturer_por_dominio(
                     "." + dominio_oficial
                 )
             ):
-
                 return manufacturer
 
     return ""
@@ -304,125 +355,7 @@ def limpiar_html(
 
 
 # ============================================================
-# GENERAR CONSULTAS
-# ============================================================
-
-def generar_consultas(
-    modelo: str,
-) -> list[str]:
-    """
-    Genera varias consultas para intentar encontrar
-    coincidencias exactas o aproximadas.
-
-    Ejemplo:
-
-        OLT 5800 X7
-
-    genera búsquedas como:
-
-        "OLT 5800 X7" manufacturer
-        "OLT 5800 X7" hardware
-        5800 X7 manufacturer
-        5800 X7 server
-        5800 X7 hardware
-    """
-
-    modelo = normalizar_texto(
-        modelo
-    )
-
-    consultas = []
-
-    # --------------------------------------------------------
-    # Búsqueda exacta
-    # --------------------------------------------------------
-
-    consultas.append(
-        f'"{modelo}" manufacturer'
-    )
-
-    consultas.append(
-        f'"{modelo}" hardware'
-    )
-
-    consultas.append(
-        f'"{modelo}" model'
-    )
-
-    # --------------------------------------------------------
-    # Quitar términos genéricos
-    # --------------------------------------------------------
-
-    palabras_genericas = {
-        "olt",
-        "switch",
-        "router",
-        "firewall",
-        "server",
-        "storage",
-        "device",
-        "hw",
-        "hardware",
-        "network",
-        "appliance",
-    }
-
-    partes = modelo.split()
-
-    partes_utiles = [
-        parte
-        for parte in partes
-        if parte.lower() not in palabras_genericas
-    ]
-
-    if partes_utiles:
-
-        modelo_reducido = " ".join(
-            partes_utiles
-        )
-
-        if (
-            modelo_reducido.lower()
-            != modelo.lower()
-        ):
-
-            consultas.append(
-                f'"{modelo_reducido}" manufacturer'
-            )
-
-            consultas.append(
-                f'"{modelo_reducido}" hardware'
-            )
-
-    # --------------------------------------------------------
-    # Búsqueda por tokens principales
-    # --------------------------------------------------------
-
-    if len(partes_utiles) >= 2:
-
-        consultas.append(
-            f'"{" ".join(partes_utiles)}" server'
-        )
-
-    # --------------------------------------------------------
-    # Quitar duplicados
-    # --------------------------------------------------------
-
-    resultado = []
-
-    for consulta in consultas:
-
-        if consulta not in resultado:
-
-            resultado.append(
-                consulta
-            )
-
-    return resultado
-
-
-# ============================================================
-# EXTRAER MODELO CANDIDATO DEL TÍTULO
+# EXTRAER MODELO CANDIDATO
 # ============================================================
 
 def extraer_modelo_candidato(
@@ -439,7 +372,6 @@ def extraer_modelo_candidato(
     )
 
     if not titulo:
-
         return ""
 
     # --------------------------------------------------------
@@ -455,31 +387,27 @@ def extraer_modelo_candidato(
             titulo
         )
     ):
-
         return modelo_original
 
     # --------------------------------------------------------
-    # Intentar detectar nombres comerciales
+    # Detectar nombres comerciales
     # --------------------------------------------------------
 
     patrones = [
 
-        # Ejemplo:
         # HPE ProLiant DL380 Gen10
-        r"\b(?:HPE|HP)\s+ProLiant\s+[A-Za-z0-9\-]+"
+        r"\b(?:HPE|HP)\s+ProLiant\s+[A-Za-z0-9-]+"
         r"(?:\s+Gen\d+)?",
 
-        # Ejemplo:
         # Huawei MA5800-X7
         r"\b(?:Huawei\s+)?MA\d{4}"
-        r"(?:[-\s]?[A-Z0-9]+)*",
+        r"(?:[-\s][A-Z0-9]+)?",
 
-        # Ejemplo:
         # Dell PowerEdge R730
-        r"\b(?:Dell\s+)?PowerEdge\s+[A-Za-z0-9\-]+",
+        r"\b(?:Dell\s+)?PowerEdge\s+[A-Za-z0-9-]+",
 
-        # Modelo genérico con números
-        r"\b[A-Z]{1,8}\d{2,}[A-Z0-9\-]*",
+        # Modelo genérico técnico
+        r"\b[A-Z]{1,10}\d{2,}[A-Z0-9-]*\b",
     ]
 
     for patron in patrones:
@@ -513,180 +441,215 @@ def buscar_manufacturer_web(
     )
 
     if not modelo:
+        return []
+
+    # ========================================================
+    # VALIDACIÓN LÓGICA
+    # ========================================================
+
+    if not parece_modelo_hardware(
+        modelo
+    ):
+
+        print(
+            f"[WEB OMITIDA] {modelo} "
+            f"-> no parece un modelo de hardware"
+        )
 
         return []
 
-    consultas = generar_consultas(
-        modelo
+    # ========================================================
+    # UNA SOLA CONSULTA
+    # ========================================================
+
+    consulta = (
+        f'"{modelo}" manufacturer'
+    )
+
+    print(
+        f"[WEB BUSQUEDA] {consulta}"
+    )
+
+    url = (
+        "https://html.duckduckgo.com/html/?q="
+        + quote_plus(
+            consulta
+        )
+    )
+
+    try:
+
+        response = SESSION.get(
+            url,
+            timeout=3,
+        )
+
+        response.raise_for_status()
+
+    except requests.RequestException as error:
+
+        print(
+            f"[WEB ERROR] {modelo} -> {error}"
+        )
+
+        return []
+
+    html = response.text
+
+    # ========================================================
+    # EXTRAER RESULTADOS
+    # ========================================================
+
+    bloques = re.findall(
+        r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
+        html,
+        flags=re.IGNORECASE | re.DOTALL,
+    )
+
+    print(
+        f"[WEB RESULTADOS] {modelo} -> "
+        f"{len(bloques)} resultados"
     )
 
     candidatos = {}
 
+    modelo_normalizado = (
+        normalizar_comparacion(
+            modelo
+        )
+    )
+
     # ========================================================
-    # EJECUTAR CONSULTAS
+    # ANALIZAR RESULTADOS
     # ========================================================
 
-    for consulta in consultas:
+    for enlace, titulo_html in bloques[:max_resultados]:
 
-        print(
-            f"\nBUSQUEDA WEB -> {consulta}"
+        destino = unescape(
+            enlace
         )
 
-        url = (
-            "https://html.duckduckgo.com/html/?q="
-            + quote_plus(consulta)
+        dominio = obtener_dominio(
+            destino
         )
 
-        try:
-
-            response = SESSION.get(
-                url,
-                timeout=10,
+        manufacturer = (
+            manufacturer_por_dominio(
+                dominio
             )
+        )
 
-            response.raise_for_status()
-
-        except requests.RequestException as error:
-
-            print(
-                f"Error de búsqueda web: {error}"
-            )
-
+        if not manufacturer:
             continue
 
-        html = response.text
+        titulo = limpiar_html(
+            titulo_html
+        )
 
-        bloques = re.findall(
-            r'class="result__a"[^>]*href="([^"]+)"[^>]*>(.*?)</a>',
-            html,
-            flags=re.IGNORECASE | re.DOTALL,
+        modelo_encontrado = (
+            extraer_modelo_candidato(
+                titulo,
+                modelo
+            )
         )
 
         print(
-            f"Resultados encontrados: {len(bloques)}"
+            f"[WEB MATCH] {modelo} -> "
+            f"{manufacturer} | "
+            f"{modelo_encontrado} | "
+            f"{dominio}"
         )
 
-        # ====================================================
-        # ANALIZAR RESULTADOS
-        # ====================================================
+        clave = (
+            manufacturer,
+            modelo_encontrado,
+        )
 
-        for enlace, titulo_html in bloques[
-            :max_resultados
-        ]:
+        if clave not in candidatos:
 
-            destino = unescape(
-                enlace
-            )
+            candidatos[clave] = {
+                "manufacturer": manufacturer,
+                "matched_model": modelo_encontrado,
+                "url": destino,
+                "score": 0,
+                "official_results": 0,
+            }
 
-            dominio = obtener_dominio(
-                destino
-            )
+        candidato = candidatos[
+            clave
+        ]
 
-            manufacturer = (
-                manufacturer_por_dominio(
-                    dominio
-                )
-            )
+        # ----------------------------------------------------
+        # DOMINIO OFICIAL
+        # ----------------------------------------------------
 
-            if not manufacturer:
-
-                continue
-
-            titulo = limpiar_html(
-                titulo_html
-            )
-
-            modelo_encontrado = (
-                extraer_modelo_candidato(
-                    titulo,
-                    modelo
-                )
-            )
-
-            clave = (
+        dominios_oficiales = (
+            MANUFACTURER_DOMAINS.get(
                 manufacturer,
-                modelo_encontrado,
+                set()
             )
+        )
 
-            if clave not in candidatos:
+        if dominio in dominios_oficiales:
 
-                candidatos[clave] = {
-                    "manufacturer": manufacturer,
-                    "matched_model": modelo_encontrado,
-                    "url": destino,
-                    "score": 0,
-                    "official_results": 0,
-                }
+            candidato["score"] += 5
 
-            candidato = candidatos[clave]
+            candidato[
+                "official_results"
+            ] += 1
 
-            # ------------------------------------------------
-            # Puntuación por dominio oficial
-            # ------------------------------------------------
+        else:
 
-            if dominio in {
-                "hpe.com",
-                "hp.com",
-                "dell.com",
-                "delltechnologies.com",
-                "cisco.com",
-                "huawei.com",
-                "mikrotik.com",
-                "qnap.com",
-                "arista.com",
-                "juniper.net",
-                "lenovo.com",
-                "supermicro.com",
-            }:
+            candidato["score"] += 2
 
-                candidato["score"] += 5
+        # ----------------------------------------------------
+        # COINCIDENCIA DEL MODELO
+        # ----------------------------------------------------
 
-                candidato["official_results"] += 1
-
-            else:
-
-                candidato["score"] += 2
-
-            # ------------------------------------------------
-            # Coincidencia del modelo
-            # ------------------------------------------------
-
-            modelo_normalizado = (
-                normalizar_comparacion(
-                    modelo
-                )
+        encontrado_normalizado = (
+            normalizar_comparacion(
+                modelo_encontrado
             )
+        )
 
-            encontrado_normalizado = (
-                normalizar_comparacion(
-                    modelo_encontrado
-                )
+        if (
+            modelo_normalizado
+            and
+            modelo_normalizado
+            in encontrado_normalizado
+        ):
+
+            candidato["score"] += 5
+
+        elif (
+            encontrado_normalizado
+            and
+            any(
+                token
+                in encontrado_normalizado
+                for token
+                in modelo_normalizado.split()
+                if len(token) >= 3
             )
+        ):
 
-            if (
-                modelo_normalizado
-                and
-                modelo_normalizado
-                in
-                encontrado_normalizado
-            ):
-
-                candidato["score"] += 5
-
-            elif (
-                encontrado_normalizado
-                and
-                any(
-                    token in encontrado_normalizado
-                    for token in modelo_normalizado.split()
-                    if len(token) >= 3
-                )
-            ):
-
-                candidato["score"] += 2
+            candidato["score"] += 2
 
     # ========================================================
-    # CONVERTIR CANDIDATOS EN RESULTADOS
+    # SI NO HUBO CANDIDATOS
+    # ========================================================
+
+    if not candidatos:
+
+        print(
+            f"[WEB NO ENCONTRADO] {modelo} "
+            f"-> no se encontró fabricante oficial"
+        )
+
+        return []
+
+    # ========================================================
+    # ORDENAR
     # ========================================================
 
     candidatos_ordenados = sorted(
@@ -697,17 +660,19 @@ def buscar_manufacturer_web(
 
     resultados = []
 
+    # ========================================================
+    # CONSTRUIR RESULTADOS
+    # ========================================================
+
     for candidato in candidatos_ordenados:
 
-        score = candidato["score"]
+        score = candidato[
+            "score"
+        ]
 
-        official_results = (
-            candidato["official_results"]
-        )
-
-        # ----------------------------------------------------
-        # CONFIANZA
-        # ----------------------------------------------------
+        official_results = candidato[
+            "official_results"
+        ]
 
         if (
             official_results >= 2
@@ -727,16 +692,44 @@ def buscar_manufacturer_web(
 
             confidence = "low"
 
+        resultado = ManufacturerResult(
+            model=modelo,
+            manufacturer=candidato[
+                "manufacturer"
+            ],
+            source="web",
+            confidence=confidence,
+            match_type="approximate",
+            matched_model=candidato[
+                "matched_model"
+            ],
+            url=candidato[
+                "url"
+            ],
+        )
+
         resultados.append(
-            ManufacturerResult(
-                model=modelo,
-                manufacturer=candidato["manufacturer"],
-                source="web",
-                confidence=confidence,
-                match_type="approximate",
-                matched_model=candidato["matched_model"],
-                url=candidato["url"],
-            )
+            resultado
+        )
+
+    # ========================================================
+    # MOSTRAR RESULTADO FINAL
+    # ========================================================
+
+    if resultados:
+
+        mejor = resultados[0]
+
+        print(
+            f"[WEB RESULTADO] {modelo} -> "
+            f"{mejor.manufacturer} "
+            f"({mejor.confidence})"
+        )
+
+    else:
+
+        print(
+            f"[WEB NO ENCONTRADO] {modelo}"
         )
 
     return resultados
@@ -755,9 +748,35 @@ def buscar_manufacturer(
         modelo
     )
 
-    # --------------------------------------------------------
+    if not modelo:
+
+        print(
+            "[RESULTADO] modelo vacío"
+        )
+
+        return ManufacturerResult(
+            model="",
+            manufacturer="",
+            source="none",
+            confidence="unknown",
+            match_type="unknown",
+        )
+
+    print(
+        f"\n{'=' * 60}"
+    )
+
+    print(
+        f"[ANALIZANDO] {modelo}"
+    )
+
+    print(
+        f"{'=' * 60}"
+    )
+
+    # ========================================================
     # 1. LOCAL
-    # --------------------------------------------------------
+    # ========================================================
 
     local = buscar_manufacturer_local(
         modelo
@@ -765,11 +784,17 @@ def buscar_manufacturer(
 
     if local.manufacturer:
 
+        print(
+            f"[RESULTADO FINAL] "
+            f"{modelo} -> {local.manufacturer} "
+            f"(LOCAL)"
+        )
+
         return local
 
-    # --------------------------------------------------------
+    # ========================================================
     # 2. WEB
-    # --------------------------------------------------------
+    # ========================================================
 
     if usar_web:
 
@@ -779,66 +804,30 @@ def buscar_manufacturer(
             )
         )
 
-        if not resultados_web:
+        if resultados_web:
 
-            return ManufacturerResult(
-                model=modelo,
-                manufacturer="",
-                source="none",
-                confidence="unknown",
-                match_type="unknown",
+            resultado = resultados_web[
+                0
+            ]
+
+            print(
+                f"[RESULTADO FINAL] "
+                f"{modelo} -> "
+                f"{resultado.manufacturer} "
+                f"(WEB, {resultado.confidence})"
             )
-
-        # ----------------------------------------------------
-        # UN SOLO CANDIDATO
-        # ----------------------------------------------------
-
-        if len(resultados_web) == 1:
-
-            resultado = resultados_web[0]
-
-            # Si hay buena evidencia oficial,
-            # lo consideramos una sugerencia fuerte.
-            if resultado.confidence == "high":
-
-                resultado.match_type = "approximate"
 
             return resultado
 
-        # ----------------------------------------------------
-        # VARIOS CANDIDATOS
-        # ----------------------------------------------------
-
-        mejor = resultados_web[0]
-
-        segundo = resultados_web[1]
-
-        # Si están muy cerca, no decidimos automáticamente.
-        # El usuario deberá confirmar.
-        #
-        # Ejemplo:
-        #
-        # HPE   score alto
-        # Dell  score apenas menor
-        #
-
-        # Actualmente no exponemos score en el dataclass,
-        # por lo que cualquier múltiples resultados
-        # se consideran revisión manual.
-
-        return ManufacturerResult(
-            model=modelo,
-            manufacturer=mejor.manufacturer,
-            source="web",
-            confidence=mejor.confidence,
-            match_type="approximate",
-            matched_model=mejor.matched_model,
-            url=mejor.url,
-        )
-
-    # --------------------------------------------------------
+    # ========================================================
     # 3. UNKNOWN
-    # --------------------------------------------------------
+    # ========================================================
+
+    print(
+        f"[RESULTADO FINAL] "
+        f"{modelo} -> "
+        f"NO ENCONTRADO"
+    )
 
     return ManufacturerResult(
         model=modelo,

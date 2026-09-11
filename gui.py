@@ -5,6 +5,14 @@ import threading
 import time
 
 
+# ============================================================
+# CANCELACIÓN
+# ============================================================
+
+class ProcesoCancelado(Exception):
+    pass
+
+
 class App:
 
     # ========================================================
@@ -20,7 +28,7 @@ class App:
         )
 
         self.root.geometry(
-            "1050x780"
+            "1050x820"
         )
 
         self.root.resizable(
@@ -70,6 +78,10 @@ class App:
         self.tiempo_inicio = None
 
         self.timer_id = None
+
+        self.cancel_event = threading.Event()
+
+        self.tipo_proceso = ""
 
         # ----------------------------------------------------
         # CREAR INTERFAZ
@@ -268,7 +280,7 @@ class App:
 
         self.analizar_button.pack(
             side="left",
-            padx=10
+            padx=5
         )
 
         self.convertir_button = ttk.Button(
@@ -279,7 +291,19 @@ class App:
 
         self.convertir_button.pack(
             side="left",
-            padx=10
+            padx=5
+        )
+
+        self.detener_button = ttk.Button(
+            buttons_frame,
+            text="Detener",
+            command=self.detener,
+            state="disabled"
+        )
+
+        self.detener_button.pack(
+            side="left",
+            padx=5
         )
 
         # ====================================================
@@ -294,7 +318,7 @@ class App:
 
         progress_frame.pack(
             fill="x",
-            pady=(0, 20)
+            pady=(0, 15)
         )
 
         self.progressbar = ttk.Progressbar(
@@ -322,6 +346,31 @@ class App:
         ).pack(
             anchor="w",
             pady=(5, 0)
+        )
+
+        # ====================================================
+        # DESGLOSE DE PROCESOS
+        # ====================================================
+
+        proceso_frame = ttk.LabelFrame(
+            main_frame,
+            text="Procesos",
+            padding=10
+        )
+
+        proceso_frame.pack(
+            fill="x",
+            pady=(0, 15)
+        )
+
+        self.proceso_listbox = tk.Listbox(
+            proceso_frame,
+            height=5,
+            activestyle="none"
+        )
+
+        self.proceso_listbox.pack(
+            fill="x"
         )
 
         # ====================================================
@@ -361,7 +410,7 @@ class App:
             tabla_frame,
             columns=columnas,
             show="headings",
-            height=15
+            height=11
         )
 
         # ----------------------------------------------------
@@ -521,6 +570,39 @@ class App:
 
 
     # ========================================================
+    # LIMPIAR PROCESOS
+    # ========================================================
+
+    def limpiar_procesos(self):
+
+        self.proceso_listbox.delete(
+            0,
+            tk.END
+        )
+
+
+    # ========================================================
+    # AGREGAR PROCESO
+    # ========================================================
+
+    def agregar_proceso(
+        self,
+        mensaje,
+    ):
+
+        texto = f"• {mensaje}"
+
+        self.proceso_listbox.insert(
+            tk.END,
+            texto
+        )
+
+        self.proceso_listbox.see(
+            tk.END
+        )
+
+
+    # ========================================================
     # CONTROL DE BOTONES
     # ========================================================
 
@@ -534,6 +616,10 @@ class App:
 
         self.convertir_button.config(
             state="disabled"
+        )
+
+        self.detener_button.config(
+            state="normal"
         )
 
         self.origen_button.config(
@@ -567,6 +653,10 @@ class App:
 
         self.convertir_button.config(
             state="normal"
+        )
+
+        self.detener_button.config(
+            state="disabled"
         )
 
         self.origen_button.config(
@@ -655,9 +745,6 @@ class App:
         porcentaje,
         mensaje,
     ):
-        """
-        Este método se ejecuta en el hilo principal.
-        """
 
         self.progressbar["value"] = porcentaje
 
@@ -665,9 +752,13 @@ class App:
             f"{porcentaje}% - {mensaje}"
         )
 
+        self.agregar_proceso(
+            mensaje
+        )
+
 
     # ========================================================
-    # CALLBACK DE PROGRESO DESDE THREAD
+    # CALLBACK DESDE THREAD
     # ========================================================
 
     def progreso_desde_thread(
@@ -676,14 +767,61 @@ class App:
         mensaje,
     ):
         """
-        Programa una actualización segura de Tkinter.
+        Se ejecuta dentro del thread de trabajo.
+
+        Si se solicitó detener el proceso, lanza
+        ProcesoCancelado y corta el trabajo.
         """
+
+        if self.cancel_event.is_set():
+
+            raise ProcesoCancelado()
 
         self.root.after(
             0,
             self.actualizar_progreso,
             porcentaje,
             mensaje
+        )
+
+
+    # ========================================================
+    # DETENER
+    # ========================================================
+
+    def detener(self):
+
+        if not self.proceso_activo:
+            return
+
+        respuesta = messagebox.askyesno(
+            "Detener proceso",
+            (
+                "¿Querés detener el proceso actual?\n\n"
+                "Los archivos que ya se hayan generado "
+                "pueden quedar incompletos."
+            )
+        )
+
+        if not respuesta:
+            return
+
+        self.cancel_event.set()
+
+        self.detener_button.config(
+            state="disabled"
+        )
+
+        self.status_var.set(
+            "Estado: deteniendo proceso..."
+        )
+
+        self.progress_text_var.set(
+            "Cancelando..."
+        )
+
+        self.agregar_proceso(
+            "Solicitud de detención enviada."
         )
 
 
@@ -711,7 +849,13 @@ class App:
 
             return
 
+        self.tipo_proceso = "analisis"
+
+        self.cancel_event.clear()
+
         self.limpiar_tabla()
+
+        self.limpiar_procesos()
 
         self.progressbar["value"] = 0
 
@@ -726,6 +870,10 @@ class App:
         self.bloquear_interfaz()
 
         self.iniciar_cronometro()
+
+        self.agregar_proceso(
+            "Iniciando análisis."
+        )
 
         hilo = threading.Thread(
             target=self.ejecutar_analisis,
@@ -754,10 +902,21 @@ class App:
                 progress_callback=self.progreso_desde_thread
             )
 
+            if self.cancel_event.is_set():
+
+                raise ProcesoCancelado()
+
             self.root.after(
                 0,
                 self.finalizar_analisis,
                 resultado
+            )
+
+        except ProcesoCancelado:
+
+            self.root.after(
+                0,
+                self.finalizar_proceso_cancelado
             )
 
         except Exception as error:
@@ -800,36 +959,13 @@ class App:
             "Estado: análisis terminado."
         )
 
+        self.agregar_proceso(
+            "Análisis terminado correctamente."
+        )
+
         self.detener_cronometro()
 
         self.desbloquear_interfaz()
-
-
-    # ========================================================
-    # ERROR ANÁLISIS
-    # ========================================================
-
-    def error_analisis(
-        self,
-        error,
-    ):
-
-        self.detener_cronometro()
-
-        self.progress_text_var.set(
-            "Error durante el análisis."
-        )
-
-        self.status_var.set(
-            "Estado: error durante el análisis."
-        )
-
-        self.desbloquear_interfaz()
-
-        messagebox.showerror(
-            "Error durante el análisis",
-            str(error)
-        )
 
 
     # ========================================================
@@ -935,7 +1071,7 @@ class App:
             values=(
                 "DERIVADO",
                 "Manufacturers",
-                "Desde Devices / Device Types",
+                "Desde Device Types",
                 (
                     f"{manufacturers.get('resueltos', 0)} "
                     f"resueltos | "
@@ -979,6 +1115,37 @@ class App:
                     ),
                 )
             )
+
+
+    # ========================================================
+    # ERROR ANÁLISIS
+    # ========================================================
+
+    def error_analisis(
+        self,
+        error,
+    ):
+
+        self.detener_cronometro()
+
+        self.progress_text_var.set(
+            "Error durante el análisis."
+        )
+
+        self.status_var.set(
+            "Estado: error durante el análisis."
+        )
+
+        self.agregar_proceso(
+            f"Error: {error}"
+        )
+
+        self.desbloquear_interfaz()
+
+        messagebox.showerror(
+            "Error durante el análisis",
+            str(error)
+        )
 
 
     # ========================================================
@@ -1060,6 +1227,12 @@ class App:
 
             return
 
+        self.tipo_proceso = "conversion"
+
+        self.cancel_event.clear()
+
+        self.limpiar_procesos()
+
         self.progressbar["value"] = 0
 
         self.progress_text_var.set(
@@ -1073,6 +1246,10 @@ class App:
         self.bloquear_interfaz()
 
         self.iniciar_cronometro()
+
+        self.agregar_proceso(
+            "Iniciando conversión."
+        )
 
         hilo = threading.Thread(
             target=self.ejecutar_conversion,
@@ -1115,10 +1292,21 @@ class App:
                 progress_callback=self.progreso_desde_thread
             )
 
+            if self.cancel_event.is_set():
+
+                raise ProcesoCancelado()
+
             self.root.after(
                 0,
                 self.finalizar_conversion,
                 resultado
+            )
+
+        except ProcesoCancelado:
+
+            self.root.after(
+                0,
+                self.finalizar_proceso_cancelado
             )
 
         except Exception as error:
@@ -1147,6 +1335,10 @@ class App:
 
         self.status_var.set(
             "Estado: conversión terminada."
+        )
+
+        self.agregar_proceso(
+            "Conversión terminada correctamente."
         )
 
         self.detener_cronometro()
@@ -1223,6 +1415,29 @@ class App:
 
 
     # ========================================================
+    # FINALIZAR PROCESO CANCELADO
+    # ========================================================
+
+    def finalizar_proceso_cancelado(self):
+
+        self.detener_cronometro()
+
+        self.progress_text_var.set(
+            "Proceso detenido."
+        )
+
+        self.status_var.set(
+            "Estado: proceso detenido por el usuario."
+        )
+
+        self.agregar_proceso(
+            "Proceso detenido por el usuario."
+        )
+
+        self.desbloquear_interfaz()
+
+
+    # ========================================================
     # ERROR CONVERSIÓN
     # ========================================================
 
@@ -1239,6 +1454,10 @@ class App:
 
         self.status_var.set(
             "Estado: error durante la conversión."
+        )
+
+        self.agregar_proceso(
+            f"Error: {error}"
         )
 
         self.desbloquear_interfaz()

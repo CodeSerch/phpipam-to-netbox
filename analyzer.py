@@ -34,7 +34,6 @@ def actualizar_progreso(
     """
 
     if callback is not None:
-
         callback(
             porcentaje,
             mensaje,
@@ -98,66 +97,40 @@ def normalizar_valor(
 
 
 # ============================================================
-# OBTENER TIPOS
+# OBTENER DEVICE TYPES
 # ============================================================
 
-def obtener_tipos(
+def obtener_device_types(
     archivos_encontrados: dict[str, pd.DataFrame],
 ) -> list[str]:
+    """
+    Obtiene exclusivamente los Device Types desde:
 
-    tipos = set()
+        Device Types -> Name
 
-    # --------------------------------------------------------
-    # DEVICES
-    # --------------------------------------------------------
-
-    df_devices = archivos_encontrados.get(
-        "Devices"
-    )
-
-    if (
-        df_devices is not None
-        and "type" in df_devices.columns
-    ):
-
-        valores = (
-            df_devices["type"]
-            .astype(str)
-            .str.strip()
-            .replace("", pd.NA)
-            .dropna()
-            .tolist()
-        )
-
-        tipos.update(
-            valores
-        )
-
-    # --------------------------------------------------------
-    # DEVICE TYPES
-    # --------------------------------------------------------
+    Esta es la única fuente utilizada para la búsqueda
+    de Manufacturers y para la recomendación de Roles.
+    """
 
     df_device_types = archivos_encontrados.get(
         "Device Types"
     )
 
-    if (
-        df_device_types is not None
-        and "Name" in df_device_types.columns
-    ):
+    if df_device_types is None:
+        return []
 
-        valores = (
-            df_device_types["Name"]
-            .astype(str)
-            .str.strip()
-            .replace("", pd.NA)
-            .dropna()
-            .tolist()
-        )
+    if "Name" not in df_device_types.columns:
+        return []
 
-        tipos.update(
-            valores
-        )
+    tipos = (
+        df_device_types["Name"]
+        .astype(str)
+        .str.strip()
+        .replace("", pd.NA)
+        .dropna()
+        .unique()
+        .tolist()
+    )
 
     return sorted(
         tipos
@@ -171,6 +144,14 @@ def obtener_tipos(
 def obtener_devices(
     archivos_encontrados: dict[str, pd.DataFrame],
 ) -> list[dict]:
+    """
+    Obtiene los Devices de phpIPAM.
+
+    Los Devices se utilizan posteriormente para asociar
+    el Role recomendado según su Device Type.
+
+    NO se utilizan para buscar Manufacturers.
+    """
 
     df_devices = archivos_encontrados.get(
         "Devices"
@@ -223,9 +204,13 @@ def obtener_devices(
 # ============================================================
 
 def analizar_manufacturers(
-    tipos: list[str],
+    device_types: list[str],
     progress_callback=None,
 ) -> dict:
+    """
+    Busca Manufacturers exclusivamente para los
+    Device Types de phpIPAM.
+    """
 
     resultados = []
 
@@ -233,36 +218,35 @@ def analizar_manufacturers(
     manual = 0
     desconocidos = 0
 
-    total = len(tipos)
+    total = len(
+        device_types
+    )
 
-    for indice, tipo in enumerate(
-        tipos,
+    for indice, device_type in enumerate(
+        device_types,
         start=1,
     ):
 
         if total:
-
             porcentaje = 35 + int(
                 (indice / total) * 25
             )
-
         else:
-
             porcentaje = 60
 
         actualizar_progreso(
             progress_callback,
             porcentaje,
-            f"Buscando manufacturer: {tipo}",
+            f"Buscando manufacturer: {device_type}",
         )
 
         resultado = buscar_manufacturer(
-            tipo
+            device_type
         )
 
         resultados.append(
             {
-                "original": tipo,
+                "original": device_type,
                 "manufacturer": resultado.manufacturer,
                 "matched_model": resultado.matched_model,
                 "confidence": resultado.confidence,
@@ -272,15 +256,12 @@ def analizar_manufacturers(
         )
 
         if resultado.manufacturer:
-
             resueltos += 1
 
         elif resultado.confidence == "manual":
-
             manual += 1
 
         else:
-
             desconocidos += 1
 
     return {
@@ -298,6 +279,11 @@ def analizar_manufacturers(
 def obtener_manufacturer_por_tipo(
     manufacturers: dict,
 ) -> dict[str, dict]:
+    """
+    Crea un índice:
+
+        Device Type -> resultado Manufacturer
+    """
 
     indice = {}
 
@@ -306,32 +292,41 @@ def obtener_manufacturer_por_tipo(
         [],
     ):
 
-        tipo = resultado.get(
-            "original",
-            ""
+        device_type = normalizar_valor(
+            resultado.get(
+                "original",
+                ""
+            )
         )
 
-        if not tipo:
+        if not device_type:
             continue
 
         indice[
-            tipo.lower()
+            device_type.lower()
         ] = resultado
 
     return indice
 
 
 # ============================================================
-# ANALIZAR ROLES
+# ANALIZAR ROLES POR DEVICE TYPE
 # ============================================================
 
 def analizar_roles(
+    device_types: list[str],
     dispositivos: list[dict],
     manufacturers: dict,
     progress_callback=None,
 ) -> dict:
+    """
+    Analiza el Role UNA SOLA VEZ por cada Device Type.
 
-    resultados = []
+    Después asocia el Role recomendado a cada Device
+    que utilice ese Device Type.
+
+    No realiza búsquedas web.
+    """
 
     indice_manufacturers = (
         obtener_manufacturer_por_tipo(
@@ -339,37 +334,26 @@ def analizar_roles(
         )
     )
 
-    roles_detectados = {}
-
+    roles_por_tipo = {}
     total = len(
-        dispositivos
+        device_types
     )
 
-    for indice, dispositivo in enumerate(
-        dispositivos,
+    # ========================================================
+    # ANALIZAR CADA DEVICE TYPE
+    # ========================================================
+
+    for indice, tipo in enumerate(
+        device_types,
         start=1,
     ):
 
         tipo = normalizar_valor(
-            dispositivo.get(
-                "type",
-                ""
-            )
+            tipo
         )
 
-        nombre = normalizar_valor(
-            dispositivo.get(
-                "name",
-                ""
-            )
-        )
-
-        description = normalizar_valor(
-            dispositivo.get(
-                "description",
-                ""
-            )
-        )
+        if not tipo:
+            continue
 
         manufacturer_resultado = (
             indice_manufacturers.get(
@@ -378,26 +362,50 @@ def analizar_roles(
             )
         )
 
-        manufacturer = manufacturer_resultado.get(
-            "manufacturer",
-            ""
+        manufacturer = normalizar_valor(
+            manufacturer_resultado.get(
+                "manufacturer",
+                ""
+            )
         )
 
-        matched_model = (
+        matched_model = normalizar_valor(
             manufacturer_resultado.get(
                 "matched_model",
                 ""
             )
         )
 
-        if total:
+        # Tomamos una descripción representativa
+        # de algún Device de este Device Type.
+        description = ""
 
+        for dispositivo in dispositivos:
+
+            dispositivo_tipo = normalizar_valor(
+                dispositivo.get(
+                    "type",
+                    ""
+                )
+            )
+
+            if dispositivo_tipo.lower() == tipo.lower():
+
+                description = normalizar_valor(
+                    dispositivo.get(
+                        "description",
+                        ""
+                    )
+                )
+
+                if description:
+                    break
+
+        if total:
             porcentaje = 60 + int(
                 (indice / total) * 25
             )
-
         else:
-
             porcentaje = 85
 
         actualizar_progreso(
@@ -413,18 +421,23 @@ def analizar_roles(
             description=description,
         )
 
-        role = recomendacion.get(
-            "role",
-            ""
+        role = normalizar_valor(
+            recomendacion.get(
+                "role",
+                ""
+            )
         )
 
-        confidence = recomendacion.get(
-            "confidence",
-            "unknown"
+        confidence = normalizar_valor(
+            recomendacion.get(
+                "confidence",
+                "unknown"
+            )
         )
 
-        resultado = {
-            "device": nombre,
+        roles_por_tipo[
+            tipo.lower()
+        ] = {
             "device_type": tipo,
             "manufacturer": manufacturer,
             "recommended_role": role,
@@ -434,6 +447,72 @@ def analizar_roles(
                 0
             ),
             "matched_keywords": recomendacion.get(
+                "matched_keywords",
+                []
+            ),
+        }
+
+    # ========================================================
+    # ASOCIAR ROLE A CADA DEVICE
+    # ========================================================
+
+    resultados = []
+
+    roles_detectados = {}
+
+    for dispositivo in dispositivos:
+
+        tipo = normalizar_valor(
+            dispositivo.get(
+                "type",
+                ""
+            )
+        )
+
+        nombre = normalizar_valor(
+            dispositivo.get(
+                "name",
+                ""
+            )
+        )
+
+        resultado_tipo = roles_por_tipo.get(
+            tipo.lower(),
+            {}
+        )
+
+        role = normalizar_valor(
+            resultado_tipo.get(
+                "recommended_role",
+                ""
+            )
+        )
+
+        confidence = normalizar_valor(
+            resultado_tipo.get(
+                "confidence",
+                "unknown"
+            )
+        )
+
+        manufacturer = normalizar_valor(
+            resultado_tipo.get(
+                "manufacturer",
+                ""
+            )
+        )
+
+        resultado = {
+            "device": nombre,
+            "device_type": tipo,
+            "manufacturer": manufacturer,
+            "recommended_role": role,
+            "confidence": confidence,
+            "score": resultado_tipo.get(
+                "score",
+                0
+            ),
+            "matched_keywords": resultado_tipo.get(
                 "matched_keywords",
                 []
             ),
@@ -464,6 +543,7 @@ def analizar_roles(
         "roles_detectados": list(
             roles_detectados.values()
         ),
+        "roles_por_tipo": roles_por_tipo,
     }
 
 
@@ -480,8 +560,11 @@ def analizar_exportacion(
 
     No convierte ni modifica archivos.
 
-    progress_callback:
-        función(porcentaje, mensaje)
+    Manufacturer Finder recibe exclusivamente
+    los Device Types.
+
+    Role Mapper recomienda un Role una sola vez
+    por cada Device Type.
     """
 
     carpeta = Path(
@@ -588,7 +671,7 @@ def analizar_exportacion(
             )
 
     # ========================================================
-    # OBTENER TIPOS
+    # OBTENER DEVICE TYPES
     # ========================================================
 
     actualizar_progreso(
@@ -597,7 +680,7 @@ def analizar_exportacion(
         "Analizando Device Types...",
     )
 
-    tipos = obtener_tipos(
+    device_types = obtener_device_types(
         archivos_encontrados
     )
 
@@ -620,7 +703,7 @@ def analizar_exportacion(
     # ========================================================
 
     manufacturers = analizar_manufacturers(
-        tipos,
+        device_types,
         progress_callback,
     )
 
@@ -629,6 +712,7 @@ def analizar_exportacion(
     # ========================================================
 
     roles = analizar_roles(
+        device_types,
         dispositivos,
         manufacturers,
         progress_callback,
@@ -650,7 +734,7 @@ def analizar_exportacion(
 
     return {
         "archivos": archivos_resultado,
-        "tipos": tipos,
+        "device_types": device_types,
         "devices": dispositivos,
         "manufacturers": manufacturers,
         "roles": roles,

@@ -36,6 +36,15 @@ OUTPUT_FIELDS = [
 
 
 # ============================================================
+# FABRICANTES POR DEFECTO
+# ============================================================
+
+DEFAULT_MANUFACTURERS = [
+    "Generic",
+]
+
+
+# ============================================================
 # UTILIDADES
 # ============================================================
 
@@ -44,7 +53,9 @@ def generar_slug(nombre: str) -> str:
     Genera un slug básico compatible con NetBox.
     """
 
-    nombre = str(nombre).strip().lower()
+    nombre = str(
+        nombre
+    ).strip().lower()
 
     caracteres = []
 
@@ -82,13 +93,29 @@ def normalizar_manufacturers(
     """
     Convierte una lista de fabricantes
     en registros preparados para NetBox.
+
+    Generic se incluye siempre como fabricante
+    por defecto.
     """
 
     resultados = []
 
     vistos = set()
 
-    for manufacturer in manufacturers:
+    # ========================================================
+    # DEFAULTS
+    # ========================================================
+
+    nombres = (
+        DEFAULT_MANUFACTURERS
+        + list(manufacturers)
+    )
+
+    # ========================================================
+    # NORMALIZAR Y DEDUPLICAR
+    # ========================================================
+
+    for manufacturer in nombres:
 
         nombre = str(
             manufacturer
@@ -111,7 +138,9 @@ def normalizar_manufacturers(
         resultados.append(
             {
                 "name": nombre,
-                "slug": generar_slug(nombre),
+                "slug": generar_slug(
+                    nombre
+                ),
                 "description": "",
             }
         )
@@ -129,6 +158,8 @@ def convertir_manufacturers(
 ) -> Path:
     """
     Genera manufacturers.csv compatible con NetBox.
+
+    Generic se incluye siempre.
     """
 
     destino = Path(
