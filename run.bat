@@ -13,7 +13,7 @@ if errorlevel 1 (
     exit /b 1
 )
 
-py main.py
+py src\main.py
 
 if errorlevel 1 (
     echo.

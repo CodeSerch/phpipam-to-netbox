@@ -4,13 +4,14 @@ from tkinter import ttk, filedialog, messagebox
 import threading
 import time
 
+from gui.state import AppState
+from gui.progress import ProgressManager
+from gui.main_window import MainWindow
 
 # ============================================================
 # CANCELACIÓN
 # ============================================================
 
-class ProcesoCancelado(Exception):
-    pass
 
 
 class App:
