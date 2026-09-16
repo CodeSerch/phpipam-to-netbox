@@ -3,38 +3,19 @@ import threading
 
 class AppState:
 
-    # ========================================================
-    # ESTADO DE LA APLICACIÓN
-    # ========================================================
-
     def __init__(self):
 
-        # ----------------------------------------------------
-        # DATOS DEL ANÁLISIS
-        # ----------------------------------------------------
-
+        # Datos del análisis
         self.analisis = None
-
         self.roles_por_tipo = {}
 
-        # ----------------------------------------------------
-        # ESTADO DEL PROCESO
-        # ----------------------------------------------------
-
+        # Estado del proceso
         self.proceso_activo = False
-
         self.tipo_proceso = ""
 
-        # ----------------------------------------------------
-        # CRONÓMETRO
-        # ----------------------------------------------------
-
+        # Cronómetro
         self.tiempo_inicio = None
-
         self.timer_id = None
 
-        # ----------------------------------------------------
-        # CANCELACIÓN
-        # ----------------------------------------------------
-
+        # Cancelación
         self.cancel_event = threading.Event()

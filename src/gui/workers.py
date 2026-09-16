@@ -3,12 +3,18 @@ import threading
 
 class Worker:
 
-    def __init__(self, target, callback=None, error_callback=None):
+    def __init__(
+        self,
+        target,
+        callback=None,
+        error_callback=None,
+    ):
         self.target = target
         self.callback = callback
         self.error_callback = error_callback
 
     def ejecutar(self):
+
         thread = threading.Thread(
             target=self._run,
             daemon=True
@@ -21,6 +27,7 @@ class Worker:
     def _run(self):
 
         try:
+
             resultado = self.target()
 
             if self.callback:

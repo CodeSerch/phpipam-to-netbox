@@ -2,6 +2,8 @@
 
 title phpIPAM to NetBox Converter
 
+cd /d "%~dp0"
+
 py --version >nul 2>&1
 
 if errorlevel 1 (
@@ -18,5 +20,8 @@ py src\main.py
 if errorlevel 1 (
     echo.
     echo The application terminated with an error.
+    echo.
     pause
 )
+
+exit /b

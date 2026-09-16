@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import ttk
 
@@ -9,12 +8,25 @@ class MainWindow:
 
         self.root = root
 
-        self.root.title("phpIPAM → NetBox Converter")
-        self.root.geometry("1050x820")
-        self.root.resizable(False, False)
+        self.root.title(
+            "phpIPAM → NetBox Converter"
+        )
+
+        self.root.geometry(
+            "1050x820"
+        )
+
+        self.root.resizable(
+            False,
+            False
+        )
 
         self.crear_variables()
         self.crear_interfaz()
+
+    # ========================================================
+    # VARIABLES
+    # ========================================================
 
     def crear_variables(self):
 
@@ -33,6 +45,10 @@ class MainWindow:
         self.time_var = tk.StringVar(
             value="Tiempo transcurrido: 0.0 s"
         )
+
+    # ========================================================
+    # INTERFAZ
+    # ========================================================
 
     def crear_interfaz(self):
 
@@ -54,29 +70,33 @@ class MainWindow:
         self.crear_resultados()
         self.crear_statusbar()
 
+    # ========================================================
+    # ENCABEZADO
+    # ========================================================
+
     def crear_encabezado(self):
 
-        titulo = ttk.Label(
+        ttk.Label(
             self.frame_principal,
             text="phpIPAM → NetBox Converter",
             font=("Segoe UI", 20, "bold")
-        )
-
-        titulo.pack(
+        ).pack(
             pady=(5, 5)
         )
 
-        descripcion = ttk.Label(
+        ttk.Label(
             self.frame_principal,
             text=(
                 "Herramienta para analizar y convertir "
                 "datos de phpIPAM hacia NetBox."
             )
-        )
-
-        descripcion.pack(
+        ).pack(
             pady=(0, 15)
         )
+
+    # ========================================================
+    # CONFIGURACIÓN
+    # ========================================================
 
     def crear_configuracion(self):
 
@@ -90,8 +110,6 @@ class MainWindow:
             pady=(0, 10)
         )
 
-        # Origen
-
         ttk.Label(
             frame,
             text="Carpeta de origen:"
@@ -103,28 +121,30 @@ class MainWindow:
             sticky="w"
         )
 
-        ttk.Entry(
+        self.entry_origen = ttk.Entry(
             frame,
             textvariable=self.origen_var,
             width=70
-        ).grid(
+        )
+
+        self.entry_origen.grid(
             row=0,
             column=1,
             padx=10,
             pady=8
         )
 
-        ttk.Button(
+        self.boton_origen = ttk.Button(
             frame,
             text="Examinar..."
-        ).grid(
+        )
+
+        self.boton_origen.grid(
             row=0,
             column=2,
             padx=10,
             pady=8
         )
-
-        # Destino
 
         ttk.Label(
             frame,
@@ -137,28 +157,30 @@ class MainWindow:
             sticky="w"
         )
 
-        ttk.Entry(
+        self.entry_destino = ttk.Entry(
             frame,
             textvariable=self.destino_var,
             width=70
-        ).grid(
+        )
+
+        self.entry_destino.grid(
             row=1,
             column=1,
             padx=10,
             pady=8
         )
 
-        ttk.Button(
+        self.boton_destino = ttk.Button(
             frame,
             text="Examinar..."
-        ).grid(
+        )
+
+        self.boton_destino.grid(
             row=1,
             column=2,
             padx=10,
             pady=8
         )
-
-        # Site
 
         ttk.Label(
             frame,
@@ -171,17 +193,23 @@ class MainWindow:
             sticky="w"
         )
 
-        ttk.Entry(
+        self.entry_site = ttk.Entry(
             frame,
             textvariable=self.site_var,
             width=70
-        ).grid(
+        )
+
+        self.entry_site.grid(
             row=2,
             column=1,
             padx=10,
             pady=8,
             sticky="w"
         )
+
+    # ========================================================
+    # BOTONES
+    # ========================================================
 
     def crear_botones(self):
 
@@ -228,6 +256,10 @@ class MainWindow:
             padx=5
         )
 
+    # ========================================================
+    # PROGRESO
+    # ========================================================
+
     def crear_progreso(self):
 
         frame = ttk.LabelFrame(
@@ -271,6 +303,10 @@ class MainWindow:
             pady=(2, 10)
         )
 
+    # ========================================================
+    # PROCESOS
+    # ========================================================
+
     def crear_procesos(self):
 
         frame = ttk.LabelFrame(
@@ -296,11 +332,15 @@ class MainWindow:
             pady=10
         )
 
+    # ========================================================
+    # RESULTADOS
+    # ========================================================
+
     def crear_resultados(self):
 
         frame = ttk.LabelFrame(
             self.frame_principal,
-            text="Resultados"
+            text="Resultados del análisis"
         )
 
         frame.pack(
@@ -310,9 +350,10 @@ class MainWindow:
         )
 
         columnas = (
-            "categoria",
-            "cantidad",
-            "detalle"
+            "estado",
+            "tipo",
+            "archivo",
+            "registros"
         )
 
         self.tree_resultados = ttk.Treeview(
@@ -323,34 +364,47 @@ class MainWindow:
         )
 
         self.tree_resultados.heading(
-            "categoria",
-            text="Categoría"
+            "estado",
+            text="Estado"
         )
 
         self.tree_resultados.heading(
-            "cantidad",
-            text="Cantidad"
+            "tipo",
+            text="Tipo"
         )
 
         self.tree_resultados.heading(
-            "detalle",
-            text="Detalle"
+            "archivo",
+            text="Archivo / Información"
+        )
+
+        self.tree_resultados.heading(
+            "registros",
+            text="Registros"
         )
 
         self.tree_resultados.column(
-            "categoria",
-            width=180
-        )
-
-        self.tree_resultados.column(
-            "cantidad",
+            "estado",
             width=100,
             anchor="center"
         )
 
         self.tree_resultados.column(
-            "detalle",
-            width=600
+            "tipo",
+            width=180,
+            anchor="w"
+        )
+
+        self.tree_resultados.column(
+            "archivo",
+            width=500,
+            anchor="w"
+        )
+
+        self.tree_resultados.column(
+            "registros",
+            width=180,
+            anchor="center"
         )
 
         self.tree_resultados.pack(
@@ -359,6 +413,10 @@ class MainWindow:
             padx=10,
             pady=10
         )
+
+    # ========================================================
+    # STATUS
+    # ========================================================
 
     def crear_statusbar(self):
 
@@ -379,12 +437,3 @@ class MainWindow:
             padx=5,
             pady=5
         )
-
-
-if __name__ == "__main__":
-
-    root = tk.Tk()
-
-    app = MainWindow(root)
-
-    root.mainloop()        

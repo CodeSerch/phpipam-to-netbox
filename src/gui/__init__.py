@@ -1,29 +1,28 @@
-def __init__(self):
+from .main_window import MainWindow
+from .state import AppState
+from .controller import AppController
 
-    self.root = tk.Tk()
 
-    self.root.title("phpIPAM → NetBox Converter")
-    self.root.geometry("1050x820")
-    self.root.resizable(False, False)
+class App:
 
-    # Estado de la aplicación
-    self.state = AppState()
+    def __init__(self):
 
-    # Variables de la interfaz
-    self.origen_var = tk.StringVar()
-    self.destino_var = tk.StringVar()
-    self.site_var = tk.StringVar()
+        import tkinter as tk
 
-    self.status_var = tk.StringVar(
-        value="Listo."
-    )
+        self.root = tk.Tk()
 
-    self.progress_text_var = tk.StringVar(
-        value="0% - Esperando..."
-    )
+        self.state = AppState()
 
-    self.time_var = tk.StringVar(
-        value="Tiempo transcurrido: 0.0 s"
-    )
+        self.view = MainWindow(
+            self.root
+        )
 
-    self.crear_interfaz()
+        self.controller = AppController(
+            self.root,
+            self.state,
+            self.view
+        )
+
+    def run(self):
+
+        self.root.mainloop()

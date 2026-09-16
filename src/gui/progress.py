@@ -1,6 +1,8 @@
 import time
 
-from gui.state import AppState
+
+class ProcesoCancelado(Exception):
+    pass
 
 
 class ProgressManager:
@@ -14,7 +16,6 @@ class ProgressManager:
         time_var,
         agregar_proceso_callback,
     ):
-
         self.root = root
         self.state = state
         self.progressbar = progressbar
@@ -22,9 +23,9 @@ class ProgressManager:
         self.time_var = time_var
         self.agregar_proceso = agregar_proceso_callback
 
-    # ========================================================
+    # --------------------------------------------------------
     # CRONÓMETRO
-    # ========================================================
+    # --------------------------------------------------------
 
     def iniciar_cronometro(self):
 
@@ -75,9 +76,9 @@ class ProgressManager:
                 f"Tiempo total: {tiempo:.2f} s"
             )
 
-    # ========================================================
+    # --------------------------------------------------------
     # PROGRESO
-    # ========================================================
+    # --------------------------------------------------------
 
     def actualizar_progreso(
         self,
@@ -91,13 +92,11 @@ class ProgressManager:
             f"{porcentaje}% - {mensaje}"
         )
 
-        self.agregar_proceso(
-            mensaje
-        )
+        self.agregar_proceso(mensaje)
 
-    # ========================================================
+    # --------------------------------------------------------
     # CALLBACK DESDE THREAD
-    # ========================================================
+    # --------------------------------------------------------
 
     def progreso_desde_thread(
         self,
@@ -106,7 +105,6 @@ class ProgressManager:
     ):
 
         if self.state.cancel_event.is_set():
-
             raise ProcesoCancelado()
 
         self.root.after(
@@ -115,11 +113,3 @@ class ProgressManager:
             porcentaje,
             mensaje
         )
-
-
-# ============================================================
-# CANCELACIÓN
-# ============================================================
-
-class ProcesoCancelado(Exception):
-    pass
