@@ -3,9 +3,10 @@ import tkinter as tk
 
 class AppMenu:
 
-    def __init__(self, root):
+    def __init__(self, root, on_xls_to_csv=None):
 
         self.root = root
+        self.on_xls_to_csv = on_xls_to_csv
 
     def crear(self):
 
@@ -23,7 +24,8 @@ class AppMenu:
         )
 
         herramientas_menu.add_command(
-            label="XLS / XLSX → CSV"
+            label="XLS → CSV",
+            command=self.on_xls_to_csv
         )
 
         menubar.add_cascade(
