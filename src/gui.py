@@ -31,7 +31,7 @@ class App:
 
         self.menu.crear()
 
-        print("MENU CREADO")
+print("MENU CREADO")
 
     def run(self):
 
