@@ -1,13 +1,14 @@
+import tkinter as tk
+
 from .main_window import MainWindow
 from .state import AppState
 from .controller import AppController
+from .menu import AppMenu
 
 
 class App:
 
     def __init__(self):
-
-        import tkinter as tk
 
         self.root = tk.Tk()
 
@@ -22,6 +23,15 @@ class App:
             self.state,
             self.view
         )
+
+        self.menu = AppMenu(
+            self.root,
+            on_xls_to_csv=self.controller.convertir_xls_a_csv
+        )
+
+        self.menu.crear()
+
+        print("MENU CREADO")
 
     def run(self):
 

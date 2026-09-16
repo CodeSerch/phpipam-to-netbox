@@ -1,3 +1,4 @@
+from pathlib import Path
 from tkinter import filedialog
 
 from gui.dialogs import (
@@ -672,6 +673,175 @@ class AppController:
 
         mostrar_error(
             "Error durante la conversión",
+            str(error)
+        )
+
+    # ========================================================
+    # HERRAMIENTAS
+    # ========================================================
+
+    def convertir_xls_a_csv(self):
+
+        if self.state.proceso_activo:
+            return
+
+        archivo_origen = filedialog.askopenfilename(
+            title="Seleccionar archivo XLS",
+            filetypes=[
+                (
+                    "Archivos Excel 97-2003",
+                    "*.xls"
+                )
+            ]
+        )
+
+        if not archivo_origen:
+            return
+
+        nombre_archivo = Path(
+            archivo_origen
+        ).stem
+
+        archivo_destino = filedialog.asksaveasfilename(
+            title="Guardar CSV",
+            defaultextension=".csv",
+            initialfile=f"{nombre_archivo}.csv",
+            filetypes=[
+                (
+                    "Archivos CSV",
+                    "*.csv"
+                )
+            ]
+        )
+
+        if not archivo_destino:
+            return
+
+        self.state.tipo_proceso = "xls_to_csv"
+
+        self.state.cancel_event.clear()
+
+        self.limpiar_procesos()
+
+        self.view.progressbar["value"] = 0
+
+        self.view.progress_text_var.set(
+            "0% - Preparando conversión XLS..."
+        )
+
+        self.view.status_var.set(
+            "Estado: convirtiendo XLS a CSV..."
+        )
+
+        self.bloquear_interfaz()
+
+        self.progress.iniciar_cronometro()
+
+        self.agregar_proceso(
+            "Iniciando conversión XLS → CSV."
+        )
+
+        worker = Worker(
+            target=lambda: self.ejecutar_xls_a_csv(
+                archivo_origen,
+                archivo_destino
+            )
+        )
+
+        worker.ejecutar()
+
+    def ejecutar_xls_a_csv(
+        self,
+        archivo_origen,
+        archivo_destino
+    ):
+
+        try:
+
+            from tools.xls_to_csv import convertir_xls_a_csv
+
+            resultado = convertir_xls_a_csv(
+                archivo_origen,
+                archivo_destino
+            )
+
+            if self.state.cancel_event.is_set():
+
+                raise ProcesoCancelado()
+
+            self.root.after(
+                0,
+                self.finalizar_xls_a_csv,
+                resultado
+            )
+
+        except ProcesoCancelado:
+
+            self.root.after(
+                0,
+                self.finalizar_proceso_cancelado
+            )
+
+        except Exception as error:
+
+            self.root.after(
+                0,
+                self.error_xls_a_csv,
+                error
+            )
+
+    def finalizar_xls_a_csv(self, resultado):
+
+        self.view.progressbar["value"] = 100
+
+        self.view.progress_text_var.set(
+            "100% - XLS convertido correctamente."
+        )
+
+        self.view.status_var.set(
+            "Estado: XLS convertido a CSV."
+        )
+
+        self.agregar_proceso(
+            (
+                "XLS → CSV terminado correctamente. "
+                f"{resultado['registros']} registros."
+            )
+        )
+
+        self.progress.detener_cronometro()
+
+        self.desbloquear_interfaz()
+
+        mostrar_info(
+            "Conversión completada",
+            (
+                "El archivo XLS fue convertido correctamente.\n\n"
+                f"Archivo generado:\n{resultado['archivo']}\n\n"
+                f"Registros: {resultado['registros']}"
+            )
+        )
+
+    def error_xls_a_csv(self, error):
+
+        self.progress.detener_cronometro()
+
+        self.view.progress_text_var.set(
+            "Error durante la conversión XLS."
+        )
+
+        self.view.status_var.set(
+            "Estado: error durante la conversión XLS."
+        )
+
+        self.agregar_proceso(
+            f"Error: {error}"
+        )
+
+        self.desbloquear_interfaz()
+
+        mostrar_error(
+            "Error al convertir XLS",
             str(error)
         )
 

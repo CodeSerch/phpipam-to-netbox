@@ -2,6 +2,8 @@ import tkinter as tk
 
 from gui.main_window import MainWindow
 from gui.state import AppState
+from gui.controller import AppController
+from gui.menu import AppMenu
 
 
 class App:
@@ -15,6 +17,21 @@ class App:
         self.window = MainWindow(
             self.root
         )
+
+        self.controller = AppController(
+            self.root,
+            self.state,
+            self.window
+        )
+
+        self.menu = AppMenu(
+            self.root,
+            on_xls_to_csv=self.controller.convertir_xls_a_csv
+        )
+
+        self.menu.crear()
+
+        print("MENU CREADO")
 
     def run(self):
 
